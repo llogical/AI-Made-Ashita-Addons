@@ -752,4 +752,15 @@ return {
   [2622]="Marksmanship — ODD: Trade Decrescent Shade x50",
   [3055]="Marksmanship — ODD: Trade Silver Mirror x200",
   [3518]="Marksmanship — ODD: Trade Riftsand x200"
+   -- Death Penalty (Mythic) ----------------------------------------------
+  [1087] = [[Death Penalty (Mythic): Leaden Salute vs Aquans x200]],
+  [1088] = [[Death Penalty (Mythic): Leaden Salute killing blow vs Dragons (type) x200]],
+  [1882] = [[Death Penalty (Mythic): Leaden Salute killing blow vs Undead x300]],
+  [1883] = [[Death Penalty (Mythic): Leaden Salute killing blow vs Vermin x300]],
+  [2282] = [[Death Penalty (Mythic): Leaden Salute killing blow vs Birds (type) x400]],
+  [2693] = [[Death Penalty (Mythic): Defeat Sarameya x3]],
+  [3126] = [[Death Penalty (Mythic): Defeat Battleclad Chariot x3]],
+  [3589] = [[Death Penalty (Mythic): Trade Mulcibar's Scoria x3]],
+  [3639] = [[Death Penalty (Mythic): Trade Mulcibar's Scoria x150]],
+
 }
