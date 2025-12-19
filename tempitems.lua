@@ -53,12 +53,12 @@ local function set_target(t)
     return false;
 end
 
--- Zone helpers
+-- Zone helpers so it will change the ui look in some zones (more to come later)
 local ZONE_TEMENOS  = 37;
 local ZONE_APOLLYON = 38;
 
 local function get_zone_id()
-    -- Try party manager (most reliable)
+   
     local mm = AshitaCore and AshitaCore:GetMemoryManager() or nil;
     if mm and mm.GetParty then
         local party = mm:GetParty();
@@ -68,7 +68,6 @@ local function get_zone_id()
         end
     end
 
-    -- Fallback (if available in your build)
     if mm and mm.GetPlayer then
         local pl = mm:GetPlayer();
         if pl and pl.GetZoneId then
@@ -92,7 +91,7 @@ local function read_temp_items()
     local inv = AshitaCore:GetMemoryManager():GetInventory();
     if inv == nil then return out; end
 
-    -- Temporary container index is 3 (0-based): Inventory(0), Safe(1), Storage(2), Temporary(3)
+    -- Temporary container index is 3
     local container = 3;
     local count = inv:GetContainerCount(container);
     if count == nil or count <= 0 then return out; end
@@ -171,7 +170,7 @@ local function draw_ui()
     local limbus_label = limbus_zone_label(zid);
     local is_limbus = (limbus_label ~= nil);
 
-    -- Position (hybrid: place from settings; allow dragging; save on move)
+    -- Position stuff
     imgui.SetNextWindowPos({ S.window.pos.x, S.window.pos.y }, ImGuiCond_FirstUseEver);
     imgui.SetNextWindowSize({ 420, 360 }, ImGuiCond_FirstUseEver);
 
@@ -227,7 +226,7 @@ local function draw_ui()
                 end
             end
 
-            -- Prefix
+            -- Prefix -- I put this here so you can use it with multisend or something similar
             local prefix_buf = { S.use.prefix };
             imgui.Text('Prefix :');
             imgui.SameLine();
@@ -281,16 +280,10 @@ local function draw_ui()
     imgui.End();
 end
 
--- -------------------------
--- Render tick
--- -------------------------
 ashita.events.register('d3d_present', 'tempitems_present', function ()
     draw_ui();
 end);
 
--- -------------------------
--- Convenience: open UI on load
--- -------------------------
+
 ashita.events.register('load', 'tempitems_load', function()
-    -- nothing yet
 end);
