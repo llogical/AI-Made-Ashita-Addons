@@ -8,18 +8,16 @@ require('common');
 local imgui     = require('imgui');
 local settings  = require('settings');
 
--- -------------------------
--- Settings
--- -------------------------
+
 local defaults = T{
     window = T{
         pos = T{ x = 200, y = 200 },
         open = true,
     },
     use = T{
-        prefix = '',           -- e.g. '/mss '
+        prefix = '',           -- e.g. '/mss ' for use with multisend.
         target = '<me>',       -- '<me>', '<t>', etc.
-        confirm_click = false, -- add a tiny confirm step
+        confirm_click = false, -- confirm step
     },
     ui = T{
         filter = '',
@@ -30,9 +28,6 @@ local defaults = T{
 
 local S = settings.load(defaults);
 
--- -------------------------
--- Helpers
--- -------------------------
 
 local function save()
     settings.save();
@@ -53,12 +48,12 @@ local function set_target(t)
     return false;
 end
 
--- Zone helpers so it will change the ui look in some zones (more to come later)
+
 local ZONE_TEMENOS  = 37;
 local ZONE_APOLLYON = 38;
 
 local function get_zone_id()
-   
+
     local mm = AshitaCore and AshitaCore:GetMemoryManager() or nil;
     if mm and mm.GetParty then
         local party = mm:GetParty();
@@ -85,13 +80,144 @@ local function limbus_zone_label(zone_id)
     return nil
 end
 
--- Returns a list of {id, name, count, slot}
+
+local function _ti_norm(s)
+    if type(s) ~= 'string' then return '' end
+
+    s = s:gsub(string.char(194,160), ' ')
+    s = s:gsub('\u{00A0}', ' ')
+
+    s = s:gsub('%s+', ' '):gsub('^%s+', ''):gsub('%s+$', '')
+    return s
+end
+
+
+local function parse_limbus_floor_key(name)
+    name = _ti_norm(name)
+    local low = name:lower()
+
+
+    do
+        local wing, floor = low:match('apollyon%s+([ns][we])%s*#%s*(%d+)')
+        if wing and floor then
+            return wing:upper(), tonumber(floor), 'Apollyon'
+        end
+    end
+
+
+    do
+        
+        local wing, floor = low:match('temenos%s+([neswc])%s*#%s*(%d+)')
+        if not wing then
+            wing, floor = low:match('tem%.?%s*([neswc])%s*%-%s*f%s*(%d+)')
+        end
+        if not wing then
+            wing, floor = low:match('temenos%s+([neswc])%s*%-%s*f%s*(%d+)')
+        end
+        if not wing then
+            
+            wing, floor = low:match('tem%.?%s*([neswc])%s*f%s*(%d+)')
+        end
+        if wing and floor then
+            return wing:upper(), tonumber(floor), 'Temenos'
+        end
+    end
+
+    return nil, nil, nil
+end
+
+local function draw_limbus_grouped(list, limbus_label)
+    list = (type(list) == 'table') and list or {}
+
+
+    local groups = {}
+    for _, it in ipairs(list) do
+        local wing, floor, zlabel = parse_limbus_floor_key(it.name)
+        if wing and floor and zlabel == limbus_label then
+            groups[wing] = groups[wing] or {}
+            table.insert(groups[wing], { name = _ti_norm(it.name), floor = floor })
+        end
+    end
+
+
+    local any = false
+    for _ in pairs(groups) do any = true break end
+    if not any then
+        for _, it in ipairs(list) do
+            imgui.Text(_ti_norm(it.name))
+        end
+        return
+    end
+
+
+    for _, g in pairs(groups) do
+        table.sort(g, function(a, b)
+            if a.floor ~= b.floor then return a.floor < b.floor end
+            return a.name:lower() < b.name:lower()
+        end)
+    end
+
+
+    local left, right
+    if limbus_label == 'Apollyon' then
+        left  = { 'NW', 'SW' }
+        right = { 'NE', 'SE' }
+    else
+
+        left  = { 'N', 'S', 'C' }
+        right = { 'E', 'W' }
+    end
+
+    local function draw_wing_block(wing)
+        local g = groups[wing]
+        if not g or #g == 0 then return end
+
+ 
+        imgui.TextColored({ 0.45, 0.75, 1.0, 1.0 }, wing)
+        imgui.Separator()
+
+        for i = 1, #g do
+            local row = g[i]
+            imgui.Text(row.name)
+
+
+            local next_floor = (i < #g) and g[i + 1].floor or nil
+            if next_floor ~= row.floor then
+                imgui.Separator()
+            end
+        end
+
+        
+        imgui.Dummy({ 0, 6 })
+    end
+
+
+    local avail = { imgui.GetContentRegionAvail() }
+    local gutter = 12
+    local colw = math.max(140, (avail[1] - gutter) / 2)
+
+    imgui.BeginChild('ti_limbus_left', { colw, 0 }, false)
+    for _, wing in ipairs(left) do
+        draw_wing_block(wing)
+    end
+    imgui.EndChild()
+
+    imgui.SameLine(0, gutter)
+
+    imgui.BeginChild('ti_limbus_right', { colw, 0 }, false)
+    for _, wing in ipairs(right) do
+        draw_wing_block(wing)
+    end
+    imgui.EndChild()
+end
+
+
 local function read_temp_items()
     local out = T{};
     local inv = AshitaCore:GetMemoryManager():GetInventory();
     if inv == nil then return out; end
 
-    -- Temporary container index is 3
+    
     local container = 3;
     local count = inv:GetContainerCount(container);
     if count == nil or count <= 0 then return out; end
@@ -119,14 +245,12 @@ local function issue_use(name)
     if not name or name == '' then return end
     local cm = AshitaCore:GetChatManager();
     if cm == nil then return end
-    -- Build: [prefix] /item "<name>" <target>
+
     local cmd = string.format('%s/item "%s" %s', S.use.prefix or '', name, S.use.target or '<me>');
     cm:QueueCommand(1, cmd);
 end
 
--- -------------------------
--- Commands
--- -------------------------
+
 ashita.events.register('command', 'tempitems_command', function (e)
     local args = e.command:args();
     if #args == 0 then return; end
@@ -143,7 +267,7 @@ ashita.events.register('command', 'tempitems_command', function (e)
 
     local sub = string.lower(args[2] or '');
     if sub == 'prefix' then
-        -- everything after 'prefix ' is the prefix (preserve spaces)
+ 
         local p = e.command:sub(#args[1] + #args[2] + 3) or '';
         set_prefix(p);
         return;
@@ -158,9 +282,7 @@ ashita.events.register('command', 'tempitems_command', function (e)
     end
 end);
 
--- -------------------------
--- UI
--- -------------------------
+
 local last_window_pos = { x = S.window.pos.x, y = S.window.pos.y };
 
 local function draw_ui()
@@ -170,7 +292,7 @@ local function draw_ui()
     local limbus_label = limbus_zone_label(zid);
     local is_limbus = (limbus_label ~= nil);
 
-    -- Position stuff
+
     imgui.SetNextWindowPos({ S.window.pos.x, S.window.pos.y }, ImGuiCond_FirstUseEver);
     imgui.SetNextWindowSize({ 420, 360 }, ImGuiCond_FirstUseEver);
 
@@ -180,7 +302,7 @@ local function draw_ui()
     end
 
     if imgui.Begin(title, true) then
-        -- Save new pos if moved
+
         local pos = { imgui.GetWindowPos() };
         if pos[1] ~= last_window_pos.x or pos[2] ~= last_window_pos.y then
             last_window_pos.x, last_window_pos.y = pos[1], pos[2];
@@ -188,7 +310,6 @@ local function draw_ui()
             save();
         end
 
-        -- Controls (hidden in Limbus: Temenos/Apollyon)
         if not is_limbus then
             imgui.Text('Columns:');
             do
@@ -226,7 +347,7 @@ local function draw_ui()
                 end
             end
 
-            -- Prefix -- I put this here so you can use it with multisend or something similar
+
             local prefix_buf = { S.use.prefix };
             imgui.Text('Prefix :');
             imgui.SameLine();
@@ -236,7 +357,6 @@ local function draw_ui()
                 save();
             end
 
-            -- Filter
             local filter_buf = { S.ui.filter };
             imgui.Text('Filter :');
             imgui.SameLine();
@@ -249,36 +369,36 @@ local function draw_ui()
             imgui.Separator();
         end
 
-        -- Items grid
-        local list = read_temp_items();
+
+        local list = read_temp_items() or T{};
         local filter = (S.ui.filter or ''):lower();
-        local colcount = math.max(1, S.ui.columns or 2);
-        imgui.Columns(colcount, 'ti_grid', false);
 
-        for _, it in ipairs(list) do
-            if (filter == '' or string.find(it.name:lower(), filter, 1, true)) or is_limbus then
-                local label = it.name;
-                if S.ui.show_counts and (it.count or 1) > 1 then
-                    label = string.format('%s x%d', label, it.count);
-                end
+        if is_limbus then
+            draw_limbus_grouped(list, limbus_label);
+        else
+            local colcount = math.max(1, S.ui.columns or 2);
+            imgui.Columns(colcount, 'ti_grid', false);
 
-                if is_limbus then
-                    -- Limbus temp items are not usable/clickable; show as text only.
-                    imgui.Text(label);
-                else
+            for _, it in ipairs(list) do
+                if (filter == '' or string.find(it.name:lower(), filter, 1, true)) then
+                    local label = it.name;
+                    if S.ui.show_counts and (it.count or 1) > 1 then
+                        label = string.format('%s x%d', label, it.count);
+                    end
+
                     if imgui.Button(label, { -1, 0 }) then
                         issue_use(it.name);
                     end
                 end
-
                 imgui.NextColumn();
             end
-        end
 
-        imgui.Columns(1);
+            imgui.Columns(1);
+        end
     end
     imgui.End();
 end
+
 
 ashita.events.register('d3d_present', 'tempitems_present', function ()
     draw_ui();
@@ -286,4 +406,5 @@ end);
 
 
 ashita.events.register('load', 'tempitems_load', function()
+
 end);
