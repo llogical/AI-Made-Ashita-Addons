@@ -1,1 +1,2 @@
-Please be aware that 90% of the core loginc in these addons are from AI or at least inspired and assisted with AI.
+A simple addon that displays the area name as you zone in.
+
