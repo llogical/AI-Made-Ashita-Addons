@@ -2,7 +2,7 @@
 -- Font Awesome browser for Ashita: reads ICON_FA_* globals from addons/libs/imgui.lua
 
 addon.name    = 'fa_browser'
-addon.author  = 'ilogicall'
+addon.author  = 'ilogical'
 addon.version = '0.0.1'
 addon.desc    = 'In-game Font Awesome icon browser (ICON_FA_* globals) + fallback scanner.';
 
@@ -283,3 +283,4 @@ ashita.events.register('d3d_present', 'fa_browser_present', function()
 
     imgui.End()
 end)
+
