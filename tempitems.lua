@@ -1,6 +1,6 @@
 addon.name      = 'tempitems';
 addon.author    = 'Ilogicall';
-addon.version   = '1.0.1';
+addon.version   = '1.0.2';
 addon.desc      = 'Click-to-use Temporary Items with optional command prefix.';
 addon.link      = 'https://ashitaxi.com/';
 
@@ -80,6 +80,32 @@ local function limbus_zone_label(zone_id)
     return nil
 end
 
+local function get_limbus_expected_count(limbus_label, wing)
+    wing = (wing or ''):upper()
+
+    if limbus_label == 'Apollyon' then
+        local expected = {
+            NW = 5,
+            NE = 5,
+            SW = 4,
+            SE = 4,
+        }
+        return expected[wing]
+    end
+
+    if limbus_label == 'Temenos' then
+        local expected = {
+            N = 7,
+            W = 7,
+            E = 7,
+            C = 4,
+        }
+        return expected[wing]
+    end
+
+    return nil
+end
+
 
 local function _ti_norm(s)
     if type(s) ~= 'string' then return '' end
@@ -106,7 +132,6 @@ local function parse_limbus_floor_key(name)
 
 
     do
-        
         local wing, floor = low:match('temenos%s+([neswc])%s*#%s*(%d+)')
         if not wing then
             wing, floor = low:match('tem%.?%s*([neswc])%s*%-%s*f%s*(%d+)')
@@ -115,7 +140,6 @@ local function parse_limbus_floor_key(name)
             wing, floor = low:match('temenos%s+([neswc])%s*%-%s*f%s*(%d+)')
         end
         if not wing then
-            
             wing, floor = low:match('tem%.?%s*([neswc])%s*f%s*(%d+)')
         end
         if wing and floor then
@@ -163,17 +187,24 @@ local function draw_limbus_grouped(list, limbus_label)
         left  = { 'NW', 'SW' }
         right = { 'NE', 'SE' }
     else
-
-        left  = { 'N', 'S', 'C' }
-        right = { 'E', 'W' }
+        left  = { 'N', 'C' }
+        right = { 'W', 'E' }
     end
 
     local function draw_wing_block(wing)
         local g = groups[wing]
         if not g or #g == 0 then return end
 
- 
+        local expected = get_limbus_expected_count(limbus_label, wing)
+        local is_complete = (expected ~= nil and #g >= expected)
+
         imgui.TextColored({ 0.45, 0.75, 1.0, 1.0 }, wing)
+        imgui.SameLine(0, 24)
+        if is_complete then
+            imgui.TextColored({ 0.25, 0.90, 0.25, 1.0 }, 'Complete')
+        else
+            imgui.TextColored({ 1.00, 0.60, 0.10, 1.0 }, 'Incomplete')
+        end
         imgui.Separator()
 
         for i = 1, #g do
@@ -187,7 +218,6 @@ local function draw_limbus_grouped(list, limbus_label)
             end
         end
 
-        
         imgui.Dummy({ 0, 6 })
     end
 
@@ -196,7 +226,11 @@ local function draw_limbus_grouped(list, limbus_label)
     local gutter = 12
     local colw = math.max(140, (avail[1] - gutter) / 2)
 
-    imgui.BeginChild('ti_limbus_left', { colw, 0 }, false)
+    -- Ashita v4.30 / ImGui 1.92: BeginChild no longer accepts a boolean border argument.
+    -- The third parameter is now ImGuiChildFlags.
+    local child_flags_none = rawget(_G, 'ImGuiChildFlags_None') or 0
+
+    imgui.BeginChild('ti_limbus_left', { colw, 0 }, child_flags_none)
     for _, wing in ipairs(left) do
         draw_wing_block(wing)
     end
@@ -204,7 +238,7 @@ local function draw_limbus_grouped(list, limbus_label)
 
     imgui.SameLine(0, gutter)
 
-    imgui.BeginChild('ti_limbus_right', { colw, 0 }, false)
+    imgui.BeginChild('ti_limbus_right', { colw, 0 }, child_flags_none)
     for _, wing in ipairs(right) do
         draw_wing_block(wing)
     end
@@ -217,7 +251,6 @@ local function read_temp_items()
     local inv = AshitaCore:GetMemoryManager():GetInventory();
     if inv == nil then return out; end
 
-    
     local container = 3;
     local count = inv:GetContainerCount(container);
     if count == nil or count <= 0 then return out; end
@@ -267,7 +300,6 @@ ashita.events.register('command', 'tempitems_command', function (e)
 
     local sub = string.lower(args[2] or '');
     if sub == 'prefix' then
- 
         local p = e.command:sub(#args[1] + #args[2] + 3) or '';
         set_prefix(p);
         return;
